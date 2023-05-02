@@ -8,6 +8,6 @@ phases:
     commands:
       - npm run build
   post_build:
-  commands:
-    - aws s3 cp --recursive ./build s3://invoice-frontend-test/
-    # - aws cloudfront create-invalidation --distribution-id E1QZ2ZQZQZQZQZ --paths "/*"
+    commands:
+      - aws s3 cp --recursive ./build s3://invoice-frontend-test/
+      # - aws cloudfront create-invalidation --distribution-id E1QZ2ZQZQZQZQZ --paths "/*"
