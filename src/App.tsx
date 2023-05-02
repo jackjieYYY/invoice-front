@@ -27,7 +27,7 @@ const App: React.FC = () => {
   const [loginResponse, setLoginResponse] = useState('');
   const [postInvoiceResponse, setPostInvoiceinResponse] = useState('');
   const [orderNumber, setOrderNumber] = useState<string>('');
-  const [shortLinkValue, setShortLinkValue] = useState('');
+  const [shortLinkValue, setShortLinkValue] = useState('https://www.google.com');
   const [fullLinkValue, setFullLinkValue] = useState('');
   const secret = '1'; //should be ramdomly generated
   const host = 'https://hwoo73zvog.execute-api.us-east-1.amazonaws.com/Invoices-test';
