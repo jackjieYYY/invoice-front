@@ -11,25 +11,3 @@ phases:
   commands:
     - aws s3 cp --recursive ./build s3://invoice-frontend-test/
     # - aws cloudfront create-invalidation --distribution-id E1QZ2ZQZQZQZQZ --paths "/*"
-
-artifacts:
-  files:
-    - '**/*'
-  discard-paths: yes
-
-cache:
-  paths:
-    - 'node_modules/**/*'
-
-artifacts:
-  files:
-    - '**/*'
-  discard-paths: yes
-
-deploy:
-  provider: S3
-  access_key_id: <access_key_id>
-  secret_access_key: <secret_access_key>
-  bucket: invoice-frontend-test
-  key: latest.zip
-  region: ap-southeast-1
