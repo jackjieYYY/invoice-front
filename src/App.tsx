@@ -156,7 +156,9 @@ const App: React.FC = () => {
       let config = {
         method: 'get',
         maxBodyLength: Infinity,
-        url: `${host}/invoice?orderNumber=${orderNumber}`,
+        // add orderNumber to the end of the url
+        // add reCaptchaToken to the end of the url
+        url: `${host}/invoice?orderNumber=${orderNumber}&reCaptchaToken=${reCaptchaToken}`,
         headers: {}
       };
 
