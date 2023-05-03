@@ -208,10 +208,10 @@ const App: React.FC = () => {
   }
 
   const handleVerify = (token: any) => {
-    console.log(token);
     if (token) {
       setIsVerified(true);
       reCaptchaToken = token;
+      console.log("reCaptchaToken: " + reCaptchaToken);
     }
   };
   const styles = StyleSheet.create({
