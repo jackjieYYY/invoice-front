@@ -7,8 +7,7 @@ import encBase64 from 'crypto-js/enc-base64';
 import Utf8 from 'crypto-js/enc-utf8';
 import { Document, Page, Text, StyleSheet, pdf, Image } from '@react-pdf/renderer';
 import QRCode from 'qrcode';
-
-
+import { GoogleReCaptcha, GoogleReCaptchaProvider } from 'react-google-recaptcha-v3';
 interface LoginFormProps {
   onLoginSuccess: () => void;
 }
@@ -31,7 +30,8 @@ const App: React.FC = () => {
   const [fullLinkValue, setFullLinkValue] = useState('');
   const secret = '1'; //should be ramdomly generated
   const host = 'https://hwoo73zvog.execute-api.us-east-1.amazonaws.com/Invoices-test';
-
+  const siteKey = '6Ldj-9clAAAAABJduSX_hWq0Ixvy9EIiO9dk3UXd';
+  const [isVerified, setIsVerified] = useState(false);
   // invoice
   const [invoiceJSONString, setInvoiceJsonStr] = useState<string>(`{
     "orders": [
@@ -206,8 +206,11 @@ const App: React.FC = () => {
     }
   }
 
-
-
+  const handleVerify = (token: any) => {
+    if (token) {
+      setIsVerified(true);
+    }
+  };
   const styles = StyleSheet.create({
     page: {
       backgroundColor: '#fff',
@@ -269,8 +272,12 @@ const App: React.FC = () => {
       <label>Order Number</label>
       <input type="text" id="orderNumber" value={orderNumber} onChange={handleOrderNumberChange} />
       <button onClick={handleGetInvoiceClick}>Get Invoice</button>
-            <br />
       <br />
+      <br />
+      <GoogleReCaptchaProvider reCaptchaKey="6Ldj-9clAAAAABJduSX_hWq0Ixvy9EIiO9dk3UXd">
+        <GoogleReCaptcha onVerify={handleVerify} />
+      </GoogleReCaptchaProvider>
+      {isVerified && <p>reCAPTCHA verified!</p>}
       <label htmlFor="inputField"> shortLink generator:</label>
       <input type="text" value={shortLinkValue} onChange={handleShortLinkChange} />
       <button onClick={handleGetShortLinkClick}>Get short Link</button>
