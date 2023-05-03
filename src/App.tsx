@@ -32,6 +32,7 @@ const App: React.FC = () => {
   const host = 'https://hwoo73zvog.execute-api.us-east-1.amazonaws.com/Invoices-test';
   const siteKey = '6Ldj-9clAAAAABJduSX_hWq0Ixvy9EIiO9dk3UXd';
   const [isVerified, setIsVerified] = useState(false);
+  var [reCaptchaToken] = useState<string>('');
   // invoice
   const [invoiceJSONString, setInvoiceJsonStr] = useState<string>(`{
     "orders": [
@@ -210,6 +211,7 @@ const App: React.FC = () => {
     console.log(token);
     if (token) {
       setIsVerified(true);
+      reCaptchaToken = token;
     }
   };
   const styles = StyleSheet.create({
