@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import axios from 'axios';
 import hmacSHA256 from 'crypto-js/hmac-sha256';
 import encHex from 'crypto-js/enc-hex';
@@ -155,6 +155,10 @@ class App extends React.Component {
   async generatePdfContent(invoiceData: any): Promise<any> {
     // Create styles
     // Create styles
+    const dataUrl = await QRCode.toDataURL(window.location.href);
+    const subtotal = invoiceData.order.items.reduce((acc: any, item: any) => acc + item.subTotal, 0);
+    const surcharges = invoiceData.order.surcharges.reduce((acc: any, surcharge: any) => acc + surcharge.amount, 0);
+    const gst = 0;
     const styles = StyleSheet.create({
       page: {
         flexDirection: 'column',
@@ -176,11 +180,7 @@ class App extends React.Component {
         marginBottom: 5,
         padding: 10
       },
-      itemName: {
-        flex: 2,
-        fontSize: 14,
-        fontWeight: 'bold'
-      },
+
       itemPrice: {
         flex: 1,
         fontSize: 14,
@@ -219,9 +219,15 @@ class App extends React.Component {
         width: '40%',
         padding: 20,
       },
+      orderNumberText: {
+        fontSize: 14,
+        fontWeight: 'bold',
+        paddingLeft: 10,
+      },
       typeText: {
         fontSize: 18,
-        fontWeight: 'bold'
+        fontWeight: 'bold',
+        paddingBottom: 5,
       },
       QRCodeBox: {
         width: '30%',
@@ -236,7 +242,72 @@ class App extends React.Component {
         padding: 10,
         backgroundColor: '#fff'
       },
+      test: {
+        backgroundColor: '#666',
+        display: 'flex',
+        flexDirection: 'row',
+        flexWrap: 'nowrap',
+      },
+      itemDescription: {
+        width: '60%',
+        padding: 5,
+        color: '#fff',
+        fontSize: 10,
+      },
+      itemName: {
+        width: '58%',
+        fontSize: 10,
+        fontWeight: 'bold'
+      },
+      quantityDescription:{
+        width: '15%',
+        padding: 5,
+        color: '#fff',
+        fontSize: 10,
+      },
+      quantityName:{
+        width: '15%',
+        fontSize: 10,
+        fontWeight: 'bold',
+        textAlign: 'center',
+      },
+      priceDescription:{
+        width: '15%',
+        padding: 5,
+        color: '#fff',
+        fontSize: 10,
+      },
+      priceName:{
+        width: '15%',
+        fontSize: 10,
+        fontWeight: 'bold',
+        textAlign: 'center',
+      },
+      amountDescription:{
+        width: '10%',
+        padding: 5,
+        color: '#fff',
+        fontSize: 10,
+      },
+      amountName:{
+        width: '12%',
+        fontSize: 10,
+        fontWeight: 'bold',
+        textAlign: 'right',
+      },
 
+      surchargeItemName:{
+        width: '90%',
+        fontSize: 10,
+        fontWeight: 'bold'
+      },
+
+      surchargeAmountName:{
+        width: '10%',
+        fontSize: 10,
+        fontWeight: 'bold',
+        textAlign: 'right',
+      },
       border: {
         borderBottomColor: '#000',
         borderBottomWidth: 1,
@@ -247,27 +318,32 @@ class App extends React.Component {
       },
 
       restaurantInfoBox: {
-        width: '60%',
+        width: '70%',
       },
 
       orderInfoBox: {
-        width: '40%',
-        // set align to right
-        alignItems: 'flex-end',
+        width: '30%',
+      },
+
+      restaurantInfo: {
+        fontSize: 12,
+        padding: 5,
+      },
+      invoiceInfo: {
+        fontSize: 16,
+        padding: 5,
+        textAlign: 'left',
       },
     });
 
-    const dataUrl = await QRCode.toDataURL(window.location.href);
-    const subtotal = invoiceData.order.items.reduce((acc: any, item: any) => acc + item.subTotal, 0);
-    const surcharges = invoiceData.order.surcharges.reduce((acc: any, surcharge: any) => acc + surcharge.amount, 0);
-    const gst = 0; 
+
     return (<Document>
       <Page size="A4" style={styles.page}>
         <View style={styles.section}>
           <Text style={styles.header}>Invoice</Text>
 
           <View style={styles.borderTop}>
-            <Text>Order Number: {invoiceData.order.orderNumber}</Text>
+            <Text style={styles.orderNumberText}>Order Number: {invoiceData.order.orderNumber}</Text>
             <View style={styles.row}>
               <View style={styles.referenceBox}>
                 <Text style={styles.referenceHeader}>Order Reference</Text>
@@ -283,18 +359,35 @@ class App extends React.Component {
             </View>
           </View>
 
+          <View style={styles.test}>
+            <View style={styles.itemDescription}>
+              <Text >Item Description</Text>
+            </View>
+            <View style={styles.quantityDescription}>
+              <Text >Quantity</Text>
+            </View>
+            <View style={styles.priceDescription}>
+              <Text >Price</Text>
+            </View>
+            <View style={styles.amountDescription}>
+              <Text >Amount</Text>
+            </View>
 
+            
+          </View>
           <View style={styles.borderTop}>
-            {invoiceData.order.items.map((item: { dish: { thumbImage: SourceObject; name: string | number | boolean | React.ReactElement<any, string | React.JSXElementConstructor<any>> | React.ReactFragment | React.ReactPortal | null | undefined; }; subTotal: string | number | boolean | React.ReactElement<any, string | React.JSXElementConstructor<any>> | React.ReactFragment | React.ReactPortal | null | undefined; }, index: React.Key | null | undefined) => (
+            {invoiceData.order.items.map((item: {  dish: { thumbImage: SourceObject;price:number | string, name: string | number | boolean | React.ReactElement<any, string | React.JSXElementConstructor<any>> | React.ReactFragment | React.ReactPortal | null | undefined; };quantity:number, subTotal: string | number | boolean | React.ReactElement<any, string | React.JSXElementConstructor<any>> | React.ReactFragment | React.ReactPortal | null | undefined; }, index: React.Key | null | undefined) => (
               <View style={styles.item} key={index}>
                 <Text style={styles.itemName}>{item.dish.name}</Text>
-                <Text style={styles.itemPrice}>${item.subTotal}</Text>
+                <Text style={styles.quantityName}>{item.quantity}</Text>
+                <Text style={styles.priceName}>${item.dish.price}</Text>
+                <Text style={styles.amountName}>${item.subTotal}</Text>
               </View>
             ))}
             {invoiceData.order.surcharges.map((surcharge: { name: string | number | boolean | React.ReactFragment | React.ReactPortal | React.ReactElement<any, string | React.JSXElementConstructor<any>> | null | undefined; amount: string | number | boolean | React.ReactFragment | React.ReactPortal | React.ReactElement<any, string | React.JSXElementConstructor<any>> | null | undefined; }, index: React.Key | null | undefined) => (
               <View style={styles.item} key={index}>
-                <Text style={styles.itemName}>{surcharge.name}</Text>
-                <Text style={styles.itemPrice}>${surcharge.amount}</Text>
+                <Text style={styles.surchargeItemName}>{surcharge.name}</Text>
+                <Text style={styles.surchargeAmountName}>${surcharge.amount}</Text>
               </View>
             ))}
           </View>
@@ -302,16 +395,16 @@ class App extends React.Component {
           <View style={styles.borderTop}>
             <View style={styles.row}>
               <View style={styles.restaurantInfoBox}>
-                <Text>Restaurant: {invoiceData.restaraunt}</Text>
-                <Text>Address: {invoiceData.address}</Text>
-                <Text>Phone: {invoiceData.phone}</Text>
-                <Text>ABN: 79625774882</Text>
+                <Text style={styles.restaurantInfo}>Restaurant: {invoiceData.restaraunt}</Text>
+                <Text style={styles.restaurantInfo}>Address: {invoiceData.address}</Text>
+                <Text style={styles.restaurantInfo}>Phone: {invoiceData.phone}</Text>
+                <Text style={styles.restaurantInfo}>ABN: 79625774882</Text>
               </View>
               <View style={styles.orderInfoBox}>
-                <Text>Items: {invoiceData.order.items.length}</Text>
-                <Text>Sub Total: ${Number(subtotal) + Number(surcharges)}</Text>
-                <Text>GST: ${Number(gst)}</Text>
-                <Text>Total: ${Number(subtotal) + Number(surcharges) + Number(gst)}</Text>
+                <Text style={styles.invoiceInfo}>Items: {invoiceData.order.items.length}</Text>
+                <Text style={styles.invoiceInfo}>Sub Total: ${Number(subtotal) + Number(surcharges)}</Text>
+                <Text style={styles.invoiceInfo}>GST: ${Number(gst)}</Text>
+                <Text style={styles.invoiceInfo}>Total: ${Number(subtotal) + Number(surcharges) + Number(gst)}</Text>
               </View>
             </View>
           </View>
@@ -319,23 +412,6 @@ class App extends React.Component {
       </Page>
     </Document>)
 
-    /* 
-        return (
-          <Document>
-            <Page>
-              <Text>Invoice Details</Text>
-              <Text>OrderRef: {invoice.orderRefference}</Text>
-              <Text>Orders: {JSON.stringify(invoice.orders)}</Text>
-              <Text>Address: {invoice.address}</Text>
-              <Text>Phone: {invoice.phone}</Text>
-              <Text>Restaraunt: {invoice.restaraunt}</Text>
-              <Text>Merchant Id: {invoice.merchantId}</Text>
-              <Text>Type: {invoice.type}</Text>
-              <Text>QR Code:</Text>
-              <Image src={dataUrl} style={{ width: '50%', margin: '0 auto', }} />
-            </Page>
-          </Document>
-        ) */
   };
 
   render() {
@@ -353,113 +429,113 @@ class App extends React.Component {
 
 
 
-/* 
+/*
 
 const App: React.FC = () => {
 
 
   const [shortLinkValue, setShortLinkValue] = useState('https://www.google.com');
-  const [fullLinkValue, setFullLinkValue] = useState('');
+        const [fullLinkValue, setFullLinkValue] = useState('');
 
-  const siteKey = '6Ldj-9clAAAAABJduSX_hWq0Ixvy9EIiO9dk3UXd';
-  const [isVerified, setIsVerified] = useState(false);
-  var [reCaptchaToken] = useState<string>('');
+        const siteKey = '6Ldj-9clAAAAABJduSX_hWq0Ixvy9EIiO9dk3UXd';
+        const [isVerified, setIsVerified] = useState(false);
+        var [reCaptchaToken] = useState<string>('');
 
-  const handleJsonStrChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setInvoiceJsonStr(event.target.value);
+          const handleJsonStrChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
+            setInvoiceJsonStr(event.target.value);
   };
 
-  const handleOrderNumberChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setOrderNumber(event.target.value);
+            const handleOrderNumberChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+              setOrderNumber(event.target.value);
   };
 
-  const handleShortLinkChange = (event: { target: { value: React.SetStateAction<string>; }; }) => {
-    setShortLinkValue(event.target.value);
+              const handleShortLinkChange = (event: {target: {value: React.SetStateAction<string>; }; }) => {
+                setShortLinkValue(event.target.value);
   };
-  const handleFullLinkChange = (event: { target: { value: React.SetStateAction<string>; }; }) => {
-    setFullLinkValue(event.target.value);
+                const handleFullLinkChange = (event: {target: {value: React.SetStateAction<string>; }; }) => {
+                  setFullLinkValue(event.target.value);
   };
 
 
   const handlePostInvoiceClick = async () => {
-    
-  }
+
+                  }
 
 
   const handleGetShortLinkClick = async () => {
     try {
-      let data = `{"fullLink":"${shortLinkValue}"}`;
+                    let data = `{"fullLink":"${shortLinkValue}"}`;
 
-      let config = {
-        method: 'post',
-        maxBodyLength: Infinity,
-        url: `${host}/s/`,
-        headers: {
-          'Authorization': localStorage.getItem('token'),
-          'Content-Type': 'text/plain'
+                  let config = {
+                    method: 'post',
+                  maxBodyLength: Infinity,
+                  url: `${host}/s/`,
+                  headers: {
+                    'Authorization': localStorage.getItem('token'),
+                  'Content-Type': 'text/plain'
         },
-        data: data
+                  data: data
       };
-      axios.request(config)
+                  axios.request(config)
         .then((response) => {
 
           var link = JSON.parse(response.data.message);
-          console.log(JSON.stringify(link.shortLink));
-          setFullLinkValue(host + "/s/" + link.shortLink);
+                  console.log(JSON.stringify(link.shortLink));
+                  setFullLinkValue(host + "/s/" + link.shortLink);
         })
         .catch((error) => {
-          console.log(error);
+                    console.log(error);
         });
     } catch (error) {
-      console.error(error);
+                    console.error(error);
     }
   }
 
 
-  const styles = StyleSheet.create({
-    page: {
-      backgroundColor: '#fff',
+                  const styles = StyleSheet.create({
+                    page: {
+                    backgroundColor: '#fff',
     },
-    section: {
-      margin: 10,
-      padding: 10,
-      flexGrow: 1,
+                  section: {
+                    margin: 10,
+                  padding: 10,
+                  flexGrow: 1,
     },
-    view: {
-      display: "flex",
-      flexDirection: "row",
-      justifyContent: "center",
-      width: "100%"
+                  view: {
+                    display: "flex",
+                  flexDirection: "row",
+                  justifyContent: "center",
+                  width: "100%"
     },
-    text: {
-      marginTop: 10,
-      fontSize: 8,
-      textAlign: 'center',
+                  text: {
+                    marginTop: 10,
+                  fontSize: 8,
+                  textAlign: 'center',
     },
   });
 
-  
 
 
-  return (
-    <div>
-      <textarea value={invoiceJSONString} onChange={handleJsonStrChange} style={{ width: '600px', height: '400px' }} />
-      <br />
-      <button onClick={handlePostInvoiceClick}>Post Invoice</button>
-      <label>{postInvoiceResponse}</label>
-      <br />
-      <label>Order Number</label>
-      <input type="text" id="orderNumber" value={orderNumber} onChange={handleOrderNumberChange} />
-      <button onClick={handleGetInvoiceClick}>Get Invoice</button>
-      <br />
-      <br />
-      <label htmlFor="inputField"> shortLink generator:</label>
-      <input type="text" value={shortLinkValue} onChange={handleShortLinkChange} />
-      <button onClick={handleGetShortLinkClick}>Get short Link</button>
-      <br />
-      <a href={fullLinkValue}>{fullLinkValue}</a>
-    </div>
-  );
+
+                  return (
+                  <div>
+                    <textarea value={invoiceJSONString} onChange={handleJsonStrChange} style={{ width: '600px', height: '400px' }} />
+                    <br />
+                    <button onClick={handlePostInvoiceClick}>Post Invoice</button>
+                    <label>{postInvoiceResponse}</label>
+                    <br />
+                    <label>Order Number</label>
+                    <input type="text" id="orderNumber" value={orderNumber} onChange={handleOrderNumberChange} />
+                    <button onClick={handleGetInvoiceClick}>Get Invoice</button>
+                    <br />
+                    <br />
+                    <label htmlFor="inputField"> shortLink generator:</label>
+                    <input type="text" value={shortLinkValue} onChange={handleShortLinkChange} />
+                    <button onClick={handleGetShortLinkClick}>Get short Link</button>
+                    <br />
+                    <a href={fullLinkValue}>{fullLinkValue}</a>
+                  </div>
+                  );
 } */
 
 export default App;
