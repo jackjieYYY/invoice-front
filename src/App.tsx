@@ -1,76 +1,369 @@
 import React, { useEffect, useState } from 'react';
-import AuthForm from './Auth';
 import axios from 'axios';
 import hmacSHA256 from 'crypto-js/hmac-sha256';
 import encHex from 'crypto-js/enc-hex';
 import encBase64 from 'crypto-js/enc-base64';
 import Utf8 from 'crypto-js/enc-utf8';
-import { Document, Page, Text, StyleSheet, pdf, Image } from '@react-pdf/renderer';
+import { Document, Page, Text, StyleSheet, pdf, Image, View } from '@react-pdf/renderer';
 import QRCode from 'qrcode';
 import { GoogleReCaptcha, GoogleReCaptchaProvider } from 'react-google-recaptcha-v3';
-interface LoginFormProps {
-  onLoginSuccess: () => void;
-}
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
+import invoice from './invoice';
+import { SourceObject } from '@react-pdf/types';
+class App extends React.Component {
+  token: string = "";
+  host: string = "https://hwoo73zvog.execute-api.us-east-1.amazonaws.com/Invoices-test";
+  username: string = "test";
+  password: string = "test";
+  secret: string = "1"; //should be ramdomly generated
 
-const App: React.FC = () => {
-
-  useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      setLoginResponse(token);
-    }
-  }, []);
-
-  const [username, setUsername] = useState<string>('test');
-  const [password, setPassword] = useState<string>('test');
-  const [loginResponse, setLoginResponse] = useState('');
-  const [postInvoiceResponse, setPostInvoiceinResponse] = useState('');
-  const [orderNumber, setOrderNumber] = useState<string>('');
-  const [shortLinkValue, setShortLinkValue] = useState('https://www.google.com');
-  const [fullLinkValue, setFullLinkValue] = useState('');
-  const secret = '1'; //should be ramdomly generated
-  const host = 'https://hwoo73zvog.execute-api.us-east-1.amazonaws.com/Invoices-test';
-  const siteKey = '6Ldj-9clAAAAABJduSX_hWq0Ixvy9EIiO9dk3UXd';
-  const [isVerified, setIsVerified] = useState(false);
-  var [reCaptchaToken] = useState<string>('');
   // invoice
-  const [invoiceJSONString, setInvoiceJsonStr] = useState<string>(`{
-    "orders": [
-      {
-        "duck": "10"
-      },
-      {
-        "chicken": "10"
-      }
-    ],
-    "orderRefference": "NF",
-    "address": "123 Melbourne st",
-    "phone": "123456789",
-    "restaraunt": "Melbourne best dumplings",
-    "merchantId": 1,
-    "type": "pickup"
-  }`);
+  orderNumber: string = "";
 
+  // reCaptcha
+  isVerified: boolean = false;
+  reCaptchaToken: string = "";
 
+  async componentDidMount() {
 
-  const hashStringWithHmac = (secret: string, data: string): string => {
+    await this.login();
+    await this.postInvoice();
+    await this.getInvoice();
+  }
+  constructor(props: any) {
+    super(props);
+    this.handleVerify = this.handleVerify.bind(this);
+  }
+
+  notify = (string: string) => toast(string);
+  async login() {
+    try {
+      console.log("login");
+      this.notify("Start to Login");
+      const hashData = this.hashStringWithHmac(this.secret, this.password);
+      const base64PlainData = this.username + ":" + hashData;
+      const base64Data = this.encodeBase64(base64PlainData);
+
+      let config = {
+        method: 'post',
+        url: this.host + '/auth',
+        headers: {
+          'key': this.secret,
+          'Authorization': 'Basic ' + base64Data,
+        }
+      };
+
+      await axios.request(config)
+        .then((response) => {
+          var message = JSON.parse(response.data.message);
+          localStorage.setItem('token', (message.token));
+          this.token = message.token;
+          this.notify("Login Success");
+        })
+        .catch((error) => {
+          console.log(error);
+          this.notify("Login Failed");
+        });
+
+    } catch (error) {
+      console.error(error);
+    }
+  }
+  hashStringWithHmac = (secret: string, data: string): string => {
     const hash = hmacSHA256(data, secret);
     const digest = hash.toString(encHex);
     return digest;
   }
-  const encodeBase64 = (data: string): string => {
+  encodeBase64 = (data: string): string => {
     const encoded = encBase64.stringify(Utf8.parse(data));
     return encoded;
   }
 
-
-  const handleUsernameChange = (value: string) => {
-    setUsername(value);
+  async postInvoice() {
+    try {
+      this.notify("Start to Post Invoice");
+      var jsonObj = new invoice().invoiceJSON;
+      let config = {
+        method: 'post',
+        maxBodyLength: Infinity,
+        url: this.host + '/invoice',
+        headers: {
+          'Authorization': localStorage.getItem('token'),
+          'Content-Type': 'text/plain'
+        },
+        data: jsonObj
+      };
+      await axios.request(config)
+        .then((response) => {
+          var message = JSON.parse(response.data.message);
+          var orderNumber = JSON.stringify(message.orderNumber);
+          // convert to string
+          // please remove the double quote
+          orderNumber = orderNumber.replace(/"/g, "");
+          this.orderNumber = orderNumber;
+          this.notify("Post Invoice Success");
+          this.notify("Order Number: " + orderNumber);
+        })
+        .catch((error) => {
+          console.log(error);
+          this.notify("Post Invoice Failed");
+        });
+    } catch (error) {
+      console.error(error);
+    }
   }
 
-  const handlePasswordChange = (value: string) => {
-    setPassword(value);
+  async getInvoice() {
+    try {
+      let config = {
+        method: 'get',
+        maxBodyLength: Infinity,
+        // add orderNumber to the end of the url
+        // add reCaptchaToken to the end of the url
+        url: `${this.host}/invoice?orderNumber=${this.orderNumber}&reCaptchaToken=${this.reCaptchaToken}`,
+        headers: {}
+      };
+
+      await axios.request(config)
+        .then(async (response) => {
+          var invoice = JSON.parse(response.data.message);
+          console.log(JSON.stringify(invoice));
+          const pdfContent = this.generatePdfContent(invoice);
+          let blobPDF = pdf(await pdfContent).toBlob();
+          const url = URL.createObjectURL(await blobPDF);
+          window.open(url, '_blank');
+        })
+        .catch((error) => {
+          console.log(error);
+        });
+    } catch (error) {
+      console.error(error);
+    }
   }
+  handleVerify(token: any) {
+    console.log(token)
+    if (token) {
+      this.isVerified = true;
+      this.reCaptchaToken = token;
+    }
+  };
+
+
+
+
+  async generatePdfContent(invoiceData: any): Promise<any> {
+    // Create styles
+    // Create styles
+    const styles = StyleSheet.create({
+      page: {
+        flexDirection: 'column',
+        backgroundColor: '#ffffff'
+      },
+      section: {
+        margin: 10,
+        padding: 10,
+        flexGrow: 1
+      },
+      header: {
+        fontSize: 24,
+        textAlign: 'center',
+        marginBottom: 20,
+        fontWeight: 'bold'
+      },
+      item: {
+        flexDirection: 'row',
+        marginBottom: 5,
+        padding: 10
+      },
+      itemName: {
+        flex: 2,
+        fontSize: 14,
+        fontWeight: 'bold'
+      },
+      itemPrice: {
+        flex: 1,
+        fontSize: 14,
+        textAlign: 'right'
+      },
+
+      details: {
+        fontSize: 12,
+        marginBottom: 20
+      },
+      total: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        textAlign: 'right',
+        marginTop: 20
+      },
+
+
+
+      referenceBox: {
+        width: '30%',
+        height: 100,
+        border: '1pt solid #000',
+        padding: 10,
+      },
+      referenceHeader: {
+        fontSize: 14,
+        textAlign: 'center',
+      },
+      referenceValue: {
+        fontSize: 42,
+        fontWeight: 'bold',
+        textAlign: 'center',
+      },
+      typeBox: {
+        width: '40%',
+        padding: 20,
+      },
+      typeText: {
+        fontSize: 18,
+        fontWeight: 'bold'
+      },
+      QRCodeBox: {
+        width: '30%',
+      },
+      row: {
+        flexGrow: 1,
+        flexDirection: 'row',
+        padding: 10,
+      },
+      borderTop: {
+        borderTopWidth: 1,
+        padding: 10,
+        backgroundColor: '#fff'
+      },
+
+      border: {
+        borderBottomColor: '#000',
+        borderBottomWidth: 1,
+        borderTopColor: '#000',
+        borderTopWidth: 1,
+        padding: 10,
+        backgroundColor: '#fff'
+      },
+
+      restaurantInfoBox: {
+        width: '60%',
+      },
+
+      orderInfoBox: {
+        width: '40%',
+        // set align to right
+        alignItems: 'flex-end',
+      },
+    });
+
+    const dataUrl = await QRCode.toDataURL(window.location.href);
+    const subtotal = invoiceData.order.items.reduce((acc: any, item: any) => acc + item.subTotal, 0);
+    const surcharges = invoiceData.order.surcharges.reduce((acc: any, surcharge: any) => acc + surcharge.amount, 0);
+    const gst = 0; 
+    return (<Document>
+      <Page size="A4" style={styles.page}>
+        <View style={styles.section}>
+          <Text style={styles.header}>Invoice</Text>
+
+          <View style={styles.borderTop}>
+            <Text>Order Number: {invoiceData.order.orderNumber}</Text>
+            <View style={styles.row}>
+              <View style={styles.referenceBox}>
+                <Text style={styles.referenceHeader}>Order Reference</Text>
+                <Text style={styles.referenceValue}>{invoiceData.orderRefference}</Text>
+              </View>
+              <View style={styles.typeBox}>
+                <Text style={styles.typeText}>Type: {invoiceData.order.type}</Text>
+                <Text style={styles.typeText}>{invoiceData.order.orderTime}</Text>
+              </View>
+              <View style={styles.QRCodeBox}>
+                <Image src={dataUrl} style={{ width: '100%', top: -30 }} />
+              </View>
+            </View>
+          </View>
+
+
+          <View style={styles.borderTop}>
+            {invoiceData.order.items.map((item: { dish: { thumbImage: SourceObject; name: string | number | boolean | React.ReactElement<any, string | React.JSXElementConstructor<any>> | React.ReactFragment | React.ReactPortal | null | undefined; }; subTotal: string | number | boolean | React.ReactElement<any, string | React.JSXElementConstructor<any>> | React.ReactFragment | React.ReactPortal | null | undefined; }, index: React.Key | null | undefined) => (
+              <View style={styles.item} key={index}>
+                <Text style={styles.itemName}>{item.dish.name.trimStart()}</Text>
+                <Text style={styles.itemPrice}>${item.subTotal}</Text>
+              </View>
+            ))}
+            {invoiceData.order.surcharges.map((surcharge: { name: string | number | boolean | React.ReactFragment | React.ReactPortal | React.ReactElement<any, string | React.JSXElementConstructor<any>> | null | undefined; amount: string | number | boolean | React.ReactFragment | React.ReactPortal | React.ReactElement<any, string | React.JSXElementConstructor<any>> | null | undefined; }, index: React.Key | null | undefined) => (
+              <View style={styles.item} key={index}>
+                <Text style={styles.itemName}>{surcharge.name}</Text>
+                <Text style={styles.itemPrice}>${surcharge.amount}</Text>
+              </View>
+            ))}
+          </View>
+
+          <View style={styles.borderTop}>
+            <View style={styles.row}>
+              <View style={styles.restaurantInfoBox}>
+                <Text>Restaurant: {invoiceData.restaraunt}</Text>
+                <Text>Address: {invoiceData.address}</Text>
+                <Text>Phone: {invoiceData.phone}</Text>
+                <Text>ABN: 79625774882</Text>
+              </View>
+              <View style={styles.orderInfoBox}>
+                <Text>Items: {invoiceData.order.items.length}</Text>
+                <Text>Sub Total: {Number(subtotal) + Number(surcharges)}</Text>
+                <Text>GST: {Number(gst)}</Text>
+                <Text>Total: {Number(subtotal) + Number(surcharges) + Number(gst)}</Text>
+              </View>
+            </View>
+          </View>
+        </View>
+      </Page>
+    </Document>)
+
+    /* 
+        return (
+          <Document>
+            <Page>
+              <Text>Invoice Details</Text>
+              <Text>OrderRef: {invoice.orderRefference}</Text>
+              <Text>Orders: {JSON.stringify(invoice.orders)}</Text>
+              <Text>Address: {invoice.address}</Text>
+              <Text>Phone: {invoice.phone}</Text>
+              <Text>Restaraunt: {invoice.restaraunt}</Text>
+              <Text>Merchant Id: {invoice.merchantId}</Text>
+              <Text>Type: {invoice.type}</Text>
+              <Text>QR Code:</Text>
+              <Image src={dataUrl} style={{ width: '50%', margin: '0 auto', }} />
+            </Page>
+          </Document>
+        ) */
+  };
+
+  render() {
+    return (
+      <div>
+        <ToastContainer autoClose={2000} />
+        <GoogleReCaptchaProvider reCaptchaKey="6Ldj-9clAAAAABJduSX_hWq0Ixvy9EIiO9dk3UXd">
+          <GoogleReCaptcha onVerify={this.handleVerify} />
+        </GoogleReCaptchaProvider>
+        <div>Hello, World!</div>
+      </div>);
+  }
+}
+
+
+
+
+/* 
+
+const App: React.FC = () => {
+
+
+  const [shortLinkValue, setShortLinkValue] = useState('https://www.google.com');
+  const [fullLinkValue, setFullLinkValue] = useState('');
+
+  const siteKey = '6Ldj-9clAAAAABJduSX_hWq0Ixvy9EIiO9dk3UXd';
+  const [isVerified, setIsVerified] = useState(false);
+  var [reCaptchaToken] = useState<string>('');
 
   const handleJsonStrChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
     setInvoiceJsonStr(event.target.value);
@@ -86,97 +379,10 @@ const App: React.FC = () => {
   const handleFullLinkChange = (event: { target: { value: React.SetStateAction<string>; }; }) => {
     setFullLinkValue(event.target.value);
   };
-  const handleLoginClick = async () => {
-    try {
-      const hashData = hashStringWithHmac(secret, password);
-      const base64PlainData = username + ":" + hashData;
-      const base64Data = encodeBase64(base64PlainData);
-      let config = {
-        method: 'post',
-        url: host + '/auth',
-        headers: {
-          'key': secret,
-          'Authorization': 'Basic ' + base64Data,
-        }
-      };
 
-      axios.request(config)
-        .then((response) => {
-          var message = JSON.parse(response.data.message);
-          localStorage.setItem('token', (message.token));
-          setLoginResponse(JSON.stringify((message.token)));
-        })
-        .catch((error) => {
-          console.log(error);
-          setLoginResponse(JSON.stringify(error));
-        });
-
-    } catch (error) {
-      console.error(error);
-    }
-  }
 
   const handlePostInvoiceClick = async () => {
-    try {
-
-      var data = JSON.parse(invoiceJSONString);
-      let config = {
-        method: 'post',
-        maxBodyLength: Infinity,
-        url: host + '/invoice',
-        headers: {
-          'Authorization': localStorage.getItem('token'),
-          'Content-Type': 'text/plain'
-        },
-        data: data
-      };
-      axios.request(config)
-        .then((response) => {
-          var message = JSON.parse(response.data.message);
-          var orderNumber = JSON.stringify(message.orderNumber);
-          // convert to string
-          // please remove the double quote
-          orderNumber = orderNumber.replace(/"/g, "");
-          setPostInvoiceinResponse("orderNumber:" + orderNumber);
-          setOrderNumber(orderNumber);
-        })
-        .catch((error) => {
-          console.log(error);
-        });
-
-
-      console.log(invoiceJSONString);
-    } catch (error) {
-      console.error(error);
-    }
-  }
-
-  const handleGetInvoiceClick = async () => {
-    try {
-      let config = {
-        method: 'get',
-        maxBodyLength: Infinity,
-        // add orderNumber to the end of the url
-        // add reCaptchaToken to the end of the url
-        url: `${host}/invoice?orderNumber=${orderNumber}&reCaptchaToken=${reCaptchaToken}`,
-        headers: {}
-      };
-
-      axios.request(config)
-        .then(async (response) => {
-          var invoice = JSON.parse(response.data.message);
-          console.log(JSON.stringify(invoice));
-          const pdfContent = generatePdfContent(invoice);
-          let blobPDF = pdf(await pdfContent).toBlob();
-          const url = URL.createObjectURL(await blobPDF);
-          window.open(url, '_blank');
-        })
-        .catch((error) => {
-          console.log(error);
-        });
-    } catch (error) {
-      console.error(error);
-    }
+    
   }
 
 
@@ -209,13 +415,7 @@ const App: React.FC = () => {
     }
   }
 
-  const handleVerify = (token: any) => {
-    if (token) {
-      setIsVerified(true);
-      reCaptchaToken = token;
-      console.log("reCaptchaToken: " + reCaptchaToken);
-    }
-  };
+
   const styles = StyleSheet.create({
     page: {
       backgroundColor: '#fff',
@@ -237,38 +437,12 @@ const App: React.FC = () => {
       textAlign: 'center',
     },
   });
-  const generatePdfContent = async (invoice: any): Promise<any> => {
 
-    const dataUrl = await QRCode.toDataURL("123");
-
-    return (
-      <Document>
-        <Page>
-          <Text>Invoice Details</Text>
-          <Text>OrderRef: {invoice.orderRefference}</Text>
-          <Text>Orders: {JSON.stringify(invoice.orders)}</Text>
-
-
-
-          <Text>Address: {invoice.address}</Text>
-          <Text>Phone: {invoice.phone}</Text>
-          <Text>Restaraunt: {invoice.restaraunt}</Text>
-          <Text>Merchant Id: {invoice.merchantId}</Text>
-          <Text>Type: {invoice.type}</Text>
-          <Text>QR Code:</Text>
-          <Image src={dataUrl} style={{ width: '50%', margin: '0 auto', }} />
-        </Page>
-      </Document>
-    )
-  };
+  
 
 
   return (
     <div>
-      <AuthForm username={username} password={password} onUsernameChange={handleUsernameChange} onPasswordChange={handlePasswordChange} />
-      <button onClick={handleLoginClick}>Login</button>
-      <label>{loginResponse}</label>
-      <br />
       <textarea value={invoiceJSONString} onChange={handleJsonStrChange} style={{ width: '600px', height: '400px' }} />
       <br />
       <button onClick={handlePostInvoiceClick}>Post Invoice</button>
@@ -279,19 +453,13 @@ const App: React.FC = () => {
       <button onClick={handleGetInvoiceClick}>Get Invoice</button>
       <br />
       <br />
-      <GoogleReCaptchaProvider reCaptchaKey="6Ldj-9clAAAAABJduSX_hWq0Ixvy9EIiO9dk3UXd">
-        <GoogleReCaptcha onVerify={handleVerify} />
-      </GoogleReCaptchaProvider>
-      {isVerified && <p>reCAPTCHA verified!</p>}
       <label htmlFor="inputField"> shortLink generator:</label>
       <input type="text" value={shortLinkValue} onChange={handleShortLinkChange} />
       <button onClick={handleGetShortLinkClick}>Get short Link</button>
       <br />
       <a href={fullLinkValue}>{fullLinkValue}</a>
-
-
     </div>
   );
-}
+} */
 
 export default App;
