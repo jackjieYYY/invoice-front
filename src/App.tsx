@@ -287,7 +287,7 @@ class App extends React.Component {
           <View style={styles.borderTop}>
             {invoiceData.order.items.map((item: { dish: { thumbImage: SourceObject; name: string | number | boolean | React.ReactElement<any, string | React.JSXElementConstructor<any>> | React.ReactFragment | React.ReactPortal | null | undefined; }; subTotal: string | number | boolean | React.ReactElement<any, string | React.JSXElementConstructor<any>> | React.ReactFragment | React.ReactPortal | null | undefined; }, index: React.Key | null | undefined) => (
               <View style={styles.item} key={index}>
-                <Text style={styles.itemName}>{item.dish.name.trimStart()}</Text>
+                <Text style={styles.itemName}>{item.dish.name}</Text>
                 <Text style={styles.itemPrice}>${item.subTotal}</Text>
               </View>
             ))}
