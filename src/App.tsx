@@ -309,9 +309,9 @@ class App extends React.Component {
               </View>
               <View style={styles.orderInfoBox}>
                 <Text>Items: {invoiceData.order.items.length}</Text>
-                <Text>Sub Total: {Number(subtotal) + Number(surcharges)}</Text>
-                <Text>GST: {Number(gst)}</Text>
-                <Text>Total: {Number(subtotal) + Number(surcharges) + Number(gst)}</Text>
+                <Text>Sub Total: ${Number(subtotal) + Number(surcharges)}</Text>
+                <Text>GST: ${Number(gst)}</Text>
+                <Text>Total: ${Number(subtotal) + Number(surcharges) + Number(gst)}</Text>
               </View>
             </View>
           </View>
